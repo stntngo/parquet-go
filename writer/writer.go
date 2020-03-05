@@ -1,7 +1,6 @@
 package writer
 
 import (
-	"context"
 	"encoding/binary"
 	"errors"
 	"reflect"
@@ -116,7 +115,7 @@ func (self *ParquetWriter) WriteStop() error {
 	ts := thrift.NewTSerializer()
 	ts.Protocol = thrift.NewTCompactProtocolFactory().GetProtocol(ts.Transport)
 	self.RenameSchema()
-	footerBuf, err := ts.Write(context.TODO(), self.Footer)
+	footerBuf, err := ts.Write(self.Footer)
 	if err != nil {
 		return err
 	}

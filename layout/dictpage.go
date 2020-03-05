@@ -1,15 +1,14 @@
 package layout
 
 import (
-	"context"
 	"reflect"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/xitongsys/parquet-go/common"
 	"github.com/xitongsys/parquet-go/compress"
 	"github.com/xitongsys/parquet-go/encoding"
-	"github.com/xitongsys/parquet-go/types"
 	"github.com/xitongsys/parquet-go/parquet"
+	"github.com/xitongsys/parquet-go/types"
 )
 
 type DictRecType struct {
@@ -59,7 +58,7 @@ func (page *Page) DictPageCompress(compressType parquet.CompressionCodec, pT par
 
 	ts := thrift.NewTSerializer()
 	ts.Protocol = thrift.NewTCompactProtocolFactory().GetProtocol(ts.Transport)
-	pageHeaderBuf, _ := ts.Write(context.TODO(), page.Header)
+	pageHeaderBuf, _ := ts.Write(page.Header)
 
 	var res []byte
 	res = append(res, pageHeaderBuf...)
@@ -183,7 +182,7 @@ func (page *Page) DictDataPageCompress(compressType parquet.CompressionCodec, bi
 
 	ts := thrift.NewTSerializer()
 	ts.Protocol = thrift.NewTCompactProtocolFactory().GetProtocol(ts.Transport)
-	pageHeaderBuf, _ := ts.Write(context.TODO(), page.Header)
+	pageHeaderBuf, _ := ts.Write(page.Header)
 
 	var res []byte
 	res = append(res, pageHeaderBuf...)

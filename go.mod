@@ -2,10 +2,8 @@ module github.com/xitongsys/parquet-go
 
 go 1.13
 
-replace github.com/apache/thrift v0.0.0-20181112125854-24918abba929 => github.com/apache/thrift v0.0.0-20181112125854-24918abba929
-
 require (
-	github.com/apache/thrift v0.0.0-20181112125854-24918abba929
+	github.com/apache/thrift v0.0.0-20161221203622-b2a4d4ae21c7
 	github.com/golang/snappy v0.0.0-20180518054509-2e65f85255db
 	github.com/google/go-cmp v0.4.0 // indirect
 	github.com/klauspost/compress v1.9.7

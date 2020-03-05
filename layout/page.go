@@ -2,7 +2,6 @@ package layout
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"reflect"
 	"strings"
@@ -11,9 +10,9 @@ import (
 	"github.com/xitongsys/parquet-go/common"
 	"github.com/xitongsys/parquet-go/compress"
 	"github.com/xitongsys/parquet-go/encoding"
-	"github.com/xitongsys/parquet-go/types"
-	"github.com/xitongsys/parquet-go/schema"
 	"github.com/xitongsys/parquet-go/parquet"
+	"github.com/xitongsys/parquet-go/schema"
+	"github.com/xitongsys/parquet-go/types"
 )
 
 //Page is used to store the page data
@@ -245,7 +244,7 @@ func (page *Page) DataPageCompress(compressType parquet.CompressionCodec) []byte
 
 	ts := thrift.NewTSerializer()
 	ts.Protocol = thrift.NewTCompactProtocolFactory().GetProtocol(ts.Transport)
-	pageHeaderBuf, _ := ts.Write(context.TODO(), page.Header)
+	pageHeaderBuf, _ := ts.Write(page.Header)
 
 	var res []byte
 	res = append(res, pageHeaderBuf...)
@@ -337,7 +336,7 @@ func (page *Page) DataPageV2Compress(compressType parquet.CompressionCodec) []by
 
 	ts := thrift.NewTSerializer()
 	ts.Protocol = thrift.NewTCompactProtocolFactory().GetProtocol(ts.Transport)
-	pageHeaderBuf, _ := ts.Write(context.TODO(), page.Header)
+	pageHeaderBuf, _ := ts.Write(page.Header)
 
 	var res []byte
 	res = append(res, pageHeaderBuf...)
@@ -607,7 +606,7 @@ func ReadDataPageValues(bytesReader *bytes.Reader, encodingMethod parquet.Encodi
 	var (
 		res []interface{}
 	)
-	if cnt <= 0{
+	if cnt <= 0 {
 		return res, nil
 	}
 
