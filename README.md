@@ -1,12 +1,6 @@
 # parquet-go 
-[![Travis Status for xitongsys/parquet-go](https://travis-ci.org/xitongsys/parquet-go.svg?branch=master&label=linux+build)](https://travis-ci.org/xitongsys/parquet-go)
-[![godoc for xitongsys/parquet-go](https://godoc.org/github.com/nathany/looper?status.svg)](http://godoc.org/github.com/xitongsys/parquet-go)
 
-
-parquet-go is a pure-go implementation of reading and writing the parquet format file. 
-* Support Read/Write Nested/Flat Parquet File
-* Simple to use
-* High performance
+## This Version of `parquet-go` Is Pinned To An Old Version of Apache Thrift. Do Not Use.
 
 ## Install
 Add the parquet-go library to your $GOPATH/src and install dependencies:
