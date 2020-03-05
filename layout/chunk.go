@@ -2,11 +2,11 @@ package layout
 
 import (
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/xitongsys/parquet-go/common"
-	"github.com/xitongsys/parquet-go/encoding"
-	"github.com/xitongsys/parquet-go/parquet"
-	"github.com/xitongsys/parquet-go/schema"
-	"github.com/xitongsys/parquet-go/types"
+	"github.com/stntngo/parquet-go/common"
+	"github.com/stntngo/parquet-go/encoding"
+	"github.com/stntngo/parquet-go/parquet"
+	"github.com/stntngo/parquet-go/schema"
+	"github.com/stntngo/parquet-go/types"
 )
 
 //Chunk stores the ColumnChunk in parquet file

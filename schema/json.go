@@ -4,8 +4,8 @@ import (
 	"encoding/json"
 	"errors"
 
-	"github.com/xitongsys/parquet-go/common"
-	"github.com/xitongsys/parquet-go/parquet"
+	"github.com/stntngo/parquet-go/common"
+	"github.com/stntngo/parquet-go/parquet"
 )
 
 type JSONSchemaItemType struct {
