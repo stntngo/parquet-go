@@ -4,7 +4,7 @@ package compress
 
 import (
 	"github.com/golang/snappy"
-	"github.com/stntngo/parquet-go/parquet"
+	"github.com/xitongsys/parquet-go/parquet"
 )
 
 func init() {

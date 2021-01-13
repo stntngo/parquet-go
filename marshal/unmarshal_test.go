@@ -4,20 +4,20 @@ import (
 	"fmt"
 	"testing"
 
-	. "github.com/stntngo/parquet-go/schema"
+	. "github.com/xitongsys/parquet-go/schema"
 )
 
 type Student struct {
-	Name    string               `parquet:"name=name, type=UTF8"`
+	Name    string               `parquet:"name=name, type=BYTE_ARRAY, convertedtype=UTF8"`
 	Age     int32                `parquet:"name=age, type=INT32"`
 	Weight  *int32               `parquet:"name=weight, type=INT32"`
-	Classes *map[string][]*Class `parquet:"name=classes, keytype=UTF8"`
+	Classes *map[string][]*Class `parquet:"name=classes, keytype=BYTE_ARRAY, keyconvertedtype=UTF8"`
 }
 
 type Class struct {
-	Name     string   `parquet:"name=name, type=UTF8"`
+	Name     string   `parquet:"name=name, type=BYTE_ARRAY, convertedtype=UTF8"`
 	ID       *int64   `parquet:"name=id, type=INT64"`
-	Required []string `parquet:"name=required, type=UTF8"`
+	Required []string `parquet:"name=required, valuetype=BYTE_ARRAY, valueconvertedtype=UTF8"`
 }
 
 func (c Class) String() string {
@@ -99,8 +99,8 @@ func TestMarshalUnmarshal(t *testing.T) {
 	stus := make([]interface{}, 0)
 	stus = append(stus, stu01, stu02)
 
-	src, _ := Marshal(stus, 0, len(stus), schemaHandler)
-	fmt.Println("Marshal Finished")
+	src, err := Marshal(stus, schemaHandler)
+	fmt.Println("Marshal Finished", err)
 
 	for name, table := range *src {
 		fmt.Println(name)

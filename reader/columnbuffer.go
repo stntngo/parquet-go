@@ -5,11 +5,11 @@ import (
 	"io"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/stntngo/parquet-go/common"
-	"github.com/stntngo/parquet-go/layout"
-	"github.com/stntngo/parquet-go/source"
-	"github.com/stntngo/parquet-go/schema"
-	"github.com/stntngo/parquet-go/parquet"
+	"github.com/xitongsys/parquet-go/common"
+	"github.com/xitongsys/parquet-go/layout"
+	"github.com/xitongsys/parquet-go/parquet"
+	"github.com/xitongsys/parquet-go/schema"
+	"github.com/xitongsys/parquet-go/source"
 )
 
 type ColumnBufferType struct {
@@ -112,17 +112,18 @@ func (self *ColumnBufferType) ReadPage() error {
 				if self.DataTable == nil {
 					index := self.SchemaHandler.MapIndex[self.PathStr]
 					self.DataTable = layout.NewEmptyTable()
-					self.DataTable.Type = self.SchemaHandler.SchemaElements[index].GetType()
+					self.DataTable.Schema = self.SchemaHandler.SchemaElements[index]
 					self.DataTable.Path = common.StrToPath(self.PathStr)
 
 				}
+
+				self.DataTableNumRows = self.ChunkHeader.MetaData.NumValues
 
 				for self.ChunkReadValues < self.ChunkHeader.MetaData.NumValues {
 					self.DataTable.Values = append(self.DataTable.Values, nil)
 					self.DataTable.RepetitionLevels = append(self.DataTable.RepetitionLevels, int32(0))
 					self.DataTable.DefinitionLevels = append(self.DataTable.DefinitionLevels, int32(0))
 					self.ChunkReadValues++
-					self.DataTableNumRows++
 				}
 			}
 
@@ -172,7 +173,7 @@ func (self *ColumnBufferType) ReadPageForSkip() (*layout.Page, error) {
 			self.DictPage = page
 			return page, nil
 		}
-		
+
 		if self.DataTable == nil {
 			self.DataTable = layout.NewTableFromTable(page.DataTable)
 		}

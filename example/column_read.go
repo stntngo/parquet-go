@@ -4,20 +4,20 @@ import (
 	"log"
 	"time"
 
-	"github.com/stntngo/parquet-go/local"
-	"github.com/stntngo/parquet-go/reader"
-	"github.com/stntngo/parquet-go/writer"
+	"github.com/xitongsys/parquet-go-source/local"
+	"github.com/xitongsys/parquet-go/reader"
+	"github.com/xitongsys/parquet-go/writer"
 )
 
 type Student struct {
-	Name   string           `parquet:"name=name, type=UTF8"`
+	Name   string           `parquet:"name=name, type=BYTE_ARRAY, convertedtype=UTF8"`
 	Age    int32            `parquet:"name=age, type=INT32"`
 	Id     int64            `parquet:"name=id, type=INT64"`
 	Weight float32          `parquet:"name=weight, type=FLOAT"`
 	Sex    bool             `parquet:"name=sex, type=BOOLEAN"`
-	Day    int32            `parquet:"name=day, type=DATE"`
-	Class  []string         `parquet:"name=class, type=SLICE, valuetype=UTF8"`
-	Score  map[string]int32 `parquet:"name=score, type=MAP, keytype=UTF8, valuetype=INT32"`
+	Day    int32            `parquet:"name=day, type=INT32, convertedtype=DATE"`
+	Class  []string         `parquet:"name=class, type=SLICE, convertedtype=SLICE, valuetype=BYTE_ARRAY, valueconvertedtype=UTF8"`
+	Score  map[string]int32 `parquet:"name=score, type=MAP, convertedtype=MAP, keytype=BYTE_ARRAY, keyconvertedtype=UTF8, valuetype=INT32"`
 }
 
 func main() {

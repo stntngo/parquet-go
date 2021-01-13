@@ -3,34 +3,34 @@ package main
 import (
 	"log"
 	"time"
+	"os"
 
-	"github.com/stntngo/parquet-go/inmemory"
-	"github.com/stntngo/parquet-go/parquet"
-	"github.com/stntngo/parquet-go/reader"
-	"github.com/stntngo/parquet-go/writer"
+	"github.com/xitongsys/parquet-go-source/local"
+	"github.com/xitongsys/parquet-go/parquet"
+	"github.com/xitongsys/parquet-go/reader"
+	"github.com/xitongsys/parquet-go/writer"
 )
 
 type Student struct {
-	Name    string  `parquet:"name=name, type=UTF8, encoding=PLAIN_DICTIONARY"`
+	Name    string  `parquet:"name=name, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
 	Age     int32   `parquet:"name=age, type=INT32, encoding=PLAIN"`
 	Id      int64   `parquet:"name=id, type=INT64"`
 	Weight  float32 `parquet:"name=weight, type=FLOAT"`
 	Sex     bool    `parquet:"name=sex, type=BOOLEAN"`
-	Day     int32   `parquet:"name=day, type=DATE"`
+	Day     int32   `parquet:"name=day, type=INT32, convertedtype=DATE"`
 	Ignored int32   //without parquet tag and won't write
 }
 
 func main() {
-	defer inmemory.Remove("flat.parquet")
 	var err error
-	fw, err := inmemory.NewInMemoryFileWriter("flat.parquet")
+	w, err := os.Create("output/flat.parquet")
 	if err != nil {
-		log.Println("Can't create in memory file", err)
+		log.Println("Can't create local file", err)
 		return
 	}
 
 	//write
-	pw, err := writer.NewParquetWriter(fw, new(Student), 4)
+	pw, err := writer.NewParquetWriterFromWriter(w, new(Student), 4)
 	if err != nil {
 		log.Println("Can't create parquet writer", err)
 		return
@@ -57,10 +57,10 @@ func main() {
 		return
 	}
 	log.Println("Write Finished")
-	fw.Close()
+	w.Close()
 
 	///read
-	fr, err := inmemory.NewInMemoryFileReader("flat.parquet")
+	fr, err := local.NewLocalFileReader("output/flat.parquet")
 	if err != nil {
 		log.Println("Can't open file")
 		return

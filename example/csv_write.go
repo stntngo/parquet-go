@@ -4,14 +4,14 @@ import (
 	"fmt"
 	"log"
 
-	"github.com/stntngo/parquet-go/local"
-	"github.com/stntngo/parquet-go/writer"
+	"github.com/xitongsys/parquet-go-source/local"
+	"github.com/xitongsys/parquet-go/writer"
 )
 
 func main() {
 	var err error
 	md := []string{
-		"name=Name, type=UTF8, encoding=PLAIN_DICTIONARY",
+		"name=Name, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY",
 		"name=Age, type=INT32",
 		"name=Id, type=INT64",
 		"name=Weight, type=FLOAT",

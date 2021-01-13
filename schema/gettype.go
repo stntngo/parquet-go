@@ -4,8 +4,8 @@ import (
 	"reflect"
 	"fmt"
 
-	"github.com/stntngo/parquet-go/parquet"
-	"github.com/stntngo/parquet-go/types"
+	"github.com/xitongsys/parquet-go/parquet"
+	"github.com/xitongsys/parquet-go/types"
 )
 
 
@@ -41,10 +41,10 @@ func (self *SchemaHandler) GetTypes() []reflect.Type {
 			
 			if nc == 0 {
 				if *rT != parquet.FieldRepetitionType_REPEATED {
-					elementTypes[idx] = types.ParquetTypeToGoReflectType(pT, cT, rT)
+					elementTypes[idx] = types.ParquetTypeToGoReflectType(pT, rT)
 
 				} else {
-					elementTypes[idx] = reflect.SliceOf(types.ParquetTypeToGoReflectType(pT, cT, nil))
+					elementTypes[idx] = reflect.SliceOf(types.ParquetTypeToGoReflectType(pT, nil))
 				}				
 				
 			} else {

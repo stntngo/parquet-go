@@ -5,11 +5,10 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/stntngo/parquet-go/common"
-	"github.com/stntngo/parquet-go/layout"
-	"github.com/stntngo/parquet-go/schema"
-	"github.com/stntngo/parquet-go/types"
-	"github.com/stntngo/parquet-go/parquet"
+	"github.com/xitongsys/parquet-go/common"
+	"github.com/xitongsys/parquet-go/layout"
+	"github.com/xitongsys/parquet-go/parquet"
+	"github.com/xitongsys/parquet-go/schema"
 )
 
 //Record Map KeyValue pair
@@ -24,8 +23,8 @@ type MapRecord struct {
 }
 
 type SliceRecord struct {
-	Values	[]reflect.Value
-	Index	int
+	Values []reflect.Value
+	Index  int
 }
 
 //Convert the table map to objects slice. desInterface is a slice of pointers of objects
@@ -88,13 +87,13 @@ func Unmarshal(tableMap *map[string]*layout.Table, bgn int, end int, dstInterfac
 		bgn := tableBgn[name]
 		end := tableEnd[name]
 		schemaIndexs := make([]int, len(path))
-		for i := 0; i< len(path); i++ {
-			curPathStr := common.PathToStr(path[:i + 1])
+		for i := 0; i < len(path); i++ {
+			curPathStr := common.PathToStr(path[:i+1])
 			schemaIndexs[i] = int(schemaHandler.MapIndex[curPathStr])
 		}
 
 		repetitionLevels, definitionLevels := make([]int32, len(path)), make([]int32, len(path))
-		for i := 0; i<len(path); i++ {
+		for i := 0; i < len(path); i++ {
 			repetitionLevels[i], _ = schemaHandler.MaxRepetitionLevel(path[:i+1])
 			definitionLevels[i], _ = schemaHandler.MaxDefinitionLevel(path[:i+1])
 		}
@@ -111,17 +110,17 @@ func Unmarshal(tableMap *map[string]*layout.Table, bgn int, end int, dstInterfac
 			po, index := root, prefixIndex
 			for index < len(path) {
 				schemaIndex := schemaIndexs[index]
-				pT, cT := schemaHandler.SchemaElements[schemaIndex].Type, schemaHandler.SchemaElements[schemaIndex].ConvertedType
+				_, cT := schemaHandler.SchemaElements[schemaIndex].Type, schemaHandler.SchemaElements[schemaIndex].ConvertedType
 
-				if po.Type().Kind() == reflect.Slice && (cT == nil || *cT != parquet.ConvertedType_LIST){
+				if po.Type().Kind() == reflect.Slice && (cT == nil || *cT != parquet.ConvertedType_LIST) {
 					if po.IsNil() {
 						po.Set(reflect.MakeSlice(po.Type(), 0, 0))
 					}
 
 					if _, ok := sliceRecords[po]; !ok {
 						sliceRecords[po] = &SliceRecord{
-							Values:	[]reflect.Value{},
-							Index:	-1,
+							Values: []reflect.Value{},
+							Index:  -1,
 						}
 						sliceRecordsStack = append(sliceRecordsStack, po)
 					}
@@ -143,8 +142,8 @@ func Unmarshal(tableMap *map[string]*layout.Table, bgn int, end int, dstInterfac
 
 					if _, ok := sliceRecords[po]; !ok {
 						sliceRecords[po] = &SliceRecord{
-							Values:	[]reflect.Value{},
-							Index:	-1,
+							Values: []reflect.Value{},
+							Index:  -1,
 						}
 						sliceRecordsStack = append(sliceRecordsStack, po)
 					}
@@ -172,11 +171,11 @@ func Unmarshal(tableMap *map[string]*layout.Table, bgn int, end int, dstInterfac
 					if po.IsNil() {
 						po.Set(reflect.MakeMap(po.Type()))
 					}
-					
+
 					if _, ok := mapRecords[po]; !ok {
 						mapRecords[po] = &MapRecord{
-							KeyValues:	[]KeyValue{},
-							Index:		-1,
+							KeyValues: []KeyValue{},
+							Index:     -1,
 						}
 						mapRecordsStack = append(mapRecordsStack, po)
 					}
@@ -193,15 +192,15 @@ func Unmarshal(tableMap *map[string]*layout.Table, bgn int, end int, dstInterfac
 					if mapRecords[po].Index >= len(mapRecords[po].KeyValues) {
 						mapRecords[po].KeyValues = append(mapRecords[po].KeyValues,
 							KeyValue{
-								Key: reflect.New(po.Type().Key()).Elem(),
+								Key:   reflect.New(po.Type().Key()).Elem(),
 								Value: reflect.New(po.Type().Elem()).Elem(),
-						})
+							})
 					}
 
-					if strings.ToLower(path[index + 1]) == "key" {
+					if strings.ToLower(path[index+1]) == "key" {
 						po = mapRecords[po].KeyValues[mapRecords[po].Index].Key
 
-					}else {
+					} else {
 						po = mapRecords[po].KeyValues[mapRecords[po].Index].Value
 					}
 
@@ -220,12 +219,12 @@ func Unmarshal(tableMap *map[string]*layout.Table, bgn int, end int, dstInterfac
 				} else if po.Type().Kind() == reflect.Struct {
 					index++
 					if definitionLevels[index] > dl {
-						break;
+						break
 					}
 					po = po.FieldByName(path[index])
 
 				} else {
-					po.Set(reflect.ValueOf(types.ParquetTypeToGoType(val, pT, cT)))
+					po.Set(reflect.ValueOf(val).Convert(po.Type()))
 					break
 				}
 			}

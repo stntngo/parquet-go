@@ -7,8 +7,8 @@ import (
 	"reflect"
 	"testing"
 
-	. "github.com/stntngo/parquet-go/types"
-	"github.com/stntngo/parquet-go/parquet"
+	"github.com/xitongsys/parquet-go/parquet"
+	. "github.com/xitongsys/parquet-go/types"
 )
 
 func TestHeadToUpper(t *testing.T) {
@@ -26,26 +26,6 @@ func TestHeadToUpper(t *testing.T) {
 		res := HeadToUpper(data.Str)
 		if res != data.Expected {
 			t.Errorf("HeadToUpper err, expect %v, get %v", data.Expected, res)
-		}
-	}
-}
-
-func TestBitNum(t *testing.T) {
-	testData := []struct {
-		Num      uint64
-		Expected uint64
-	}{
-		{0, 0},
-		{1, 1},
-		{2, 2},
-		{3, 2},
-		{8, 4},
-	}
-
-	for _, data := range testData {
-		res := BitNum(data.Num)
-		if res != data.Expected {
-			t.Errorf("BitNum err, expect %v, get %v", data.Expected, res)
 		}
 	}
 }
@@ -219,8 +199,8 @@ func TestCmp(t *testing.T) {
 	}
 
 	for _, c := range cases {
-		res := Cmp(c.numa, c.numb, c.PT, c.CT)
-		fmt.Println("====", c.PT, c.CT)
+		funcTable := FindFuncTable(c.PT, c.CT, nil)
+		res := funcTable.LessThan(c.numa, c.numb)
 		if res != c.expect {
 			t.Errorf("Cmp error %v-%v, %v", c.numa, c.numa, c.str)
 		}
@@ -240,7 +220,8 @@ func TestMax(t *testing.T) {
 		{int32(1), int32(2), parquet.TypePtr(parquet.Type_INT32), nil, int32(2)},
 	}
 	for _, data := range testData {
-		res := Max(data.Num1, data.Num2, data.PT, data.CT)
+		funcTable := FindFuncTable(data.PT, data.CT, nil)
+		res := Max(funcTable, data.Num1, data.Num2)
 		if res != data.Expected {
 			t.Errorf("Max err, expect %v, get %v", data.Expected, res)
 		}
@@ -260,7 +241,8 @@ func TestMin(t *testing.T) {
 		{int32(1), int32(2), parquet.TypePtr(parquet.Type_INT32), nil, int32(1)},
 	}
 	for _, data := range testData {
-		res := Min(data.Num1, data.Num2, data.PT, data.CT)
+		funcTable := FindFuncTable(data.PT, data.CT, nil)
+		res := Min(funcTable, data.Num1, data.Num2)
 		if res != data.Expected {
 			t.Errorf("Min err, expect %v, get %v", data.Expected, res)
 		}

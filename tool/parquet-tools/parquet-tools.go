@@ -1,14 +1,14 @@
 package main
 
 import (
-	"encoding/json"
 	"flag"
 	"fmt"
+	"encoding/json"
 
-	"github.com/stntngo/parquet-go/local"
-	"github.com/stntngo/parquet-go/reader"
-	"github.com/stntngo/parquet-go/tool/parquet-tools/schematool"
-	"github.com/stntngo/parquet-go/tool/parquet-tools/sizetool"
+	"github.com/xitongsys/parquet-go-source/local"
+	"github.com/xitongsys/parquet-go/reader"
+	"github.com/xitongsys/parquet-go/tool/parquet-tools/schematool"
+	"github.com/xitongsys/parquet-go/tool/parquet-tools/sizetool"
 )
 
 func main() {
@@ -17,7 +17,7 @@ func main() {
 	withTags := flag.Bool("tag", false, "show struct tags")
 	withPrettySize := flag.Bool("pretty", false, "show pretty size")
 	uncompressedSize := flag.Bool("uncompressed", false, "show uncompressed size")
-	catCount := flag.Int("count", 1000, "max count to cat")
+	catCount := flag.Int("count", 1000, "max count to cat. If it is nil, only show first 1000 records.")
 
 	flag.Parse()
 
@@ -45,19 +45,30 @@ func main() {
 	case "size":
 		fmt.Println(sizetool.GetParquetFileSize(*fileName, pr, *withPrettySize, *uncompressedSize))
 	case "cat":
-		res, err := pr.ReadByNumber(*catCount)
-		if err != nil {
-			fmt.Println("Can't cat ", err)
-			return
-		}
+		totCnt := 0
+		for totCnt < *catCount {
+			cnt := *catCount - totCnt
+			if cnt > 1000 {
+				cnt = 1000
+			}
 
-		jsonBs, err := json.Marshal(res)
-		if err != nil {
-			fmt.Println("Can't to json ", err)
-			return
-		}
+			res, err := pr.ReadByNumber(cnt)
+			if err != nil {
+				fmt.Println("Can't cat ", err)
+				return
+			}
+	
+			jsonBs, err := json.Marshal(res)
+			if err != nil {
+				fmt.Println("Can't to json ", err)
+				return
+			}
+	
+			fmt.Println(string(jsonBs))
 
-		fmt.Println(string(jsonBs))
+			totCnt += cnt
+		}
+		
 
 	default:
 		fmt.Println("Unknown command")
