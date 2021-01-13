@@ -2,18 +2,17 @@ package layout
 
 import (
 	"bytes"
-	"context"
 	"fmt"
 	"io"
 	"math/bits"
 	"strings"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/xitongsys/parquet-go/common"
-	"github.com/xitongsys/parquet-go/compress"
-	"github.com/xitongsys/parquet-go/encoding"
-	"github.com/xitongsys/parquet-go/parquet"
-	"github.com/xitongsys/parquet-go/schema"
+	"github.com/stntngo/parquet-go/common"
+	"github.com/stntngo/parquet-go/compress"
+	"github.com/stntngo/parquet-go/encoding"
+	"github.com/stntngo/parquet-go/parquet"
+	"github.com/stntngo/parquet-go/schema"
 )
 
 //Page is used to store the page data
@@ -261,7 +260,7 @@ func (page *Page) DataPageCompress(compressType parquet.CompressionCodec) []byte
 
 	ts := thrift.NewTSerializer()
 	ts.Protocol = thrift.NewTCompactProtocolFactory().GetProtocol(ts.Transport)
-	pageHeaderBuf, _ := ts.Write(context.TODO(), page.Header)
+	pageHeaderBuf, _ := ts.Write(page.Header)
 
 	res := append(pageHeaderBuf, dataEncodeBuf...)
 	page.RawData = res
@@ -349,7 +348,7 @@ func (page *Page) DataPageV2Compress(compressType parquet.CompressionCodec) []by
 
 	ts := thrift.NewTSerializer()
 	ts.Protocol = thrift.NewTCompactProtocolFactory().GetProtocol(ts.Transport)
-	pageHeaderBuf, _ := ts.Write(context.TODO(), page.Header)
+	pageHeaderBuf, _ := ts.Write(page.Header)
 
 	var res []byte
 	res = append(res, pageHeaderBuf...)

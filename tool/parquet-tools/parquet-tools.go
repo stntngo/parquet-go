@@ -5,10 +5,10 @@ import (
 	"fmt"
 	"encoding/json"
 
-	"github.com/xitongsys/parquet-go-source/local"
-	"github.com/xitongsys/parquet-go/reader"
-	"github.com/xitongsys/parquet-go/tool/parquet-tools/schematool"
-	"github.com/xitongsys/parquet-go/tool/parquet-tools/sizetool"
+	"github.com/stntngo/parquet-go/local"
+	"github.com/stntngo/parquet-go/reader"
+	"github.com/stntngo/parquet-go/tool/parquet-tools/schematool"
+	"github.com/stntngo/parquet-go/tool/parquet-tools/sizetool"
 )
 
 func main() {

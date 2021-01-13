@@ -5,7 +5,7 @@ package compress
 import (
 	"bytes"
 	"github.com/klauspost/compress/gzip"
-	"github.com/xitongsys/parquet-go/parquet"
+	"github.com/stntngo/parquet-go/parquet"
 	"io/ioutil"
 	"sync"
 )

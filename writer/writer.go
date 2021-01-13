@@ -1,7 +1,6 @@
 package writer
 
 import (
-	"context"
 	"encoding/binary"
 	"errors"
 	"io"
@@ -9,13 +8,13 @@ import (
 	"sync"
 
 	"github.com/apache/thrift/lib/go/thrift"
-	"github.com/xitongsys/parquet-go-source/writerfile"
-	"github.com/xitongsys/parquet-go/common"
-	"github.com/xitongsys/parquet-go/layout"
-	"github.com/xitongsys/parquet-go/marshal"
-	"github.com/xitongsys/parquet-go/parquet"
-	"github.com/xitongsys/parquet-go/schema"
-	"github.com/xitongsys/parquet-go/source"
+	"github.com/stntngo/parquet-go/common"
+	"github.com/stntngo/parquet-go/layout"
+	"github.com/stntngo/parquet-go/marshal"
+	"github.com/stntngo/parquet-go/parquet"
+	"github.com/stntngo/parquet-go/schema"
+	"github.com/stntngo/parquet-go/source"
+	"github.com/stntngo/parquet-go/writerfile"
 )
 
 //ParquetWriter is a writer  parquet file
@@ -140,7 +139,7 @@ func (self *ParquetWriter) WriteStop() error {
 	idx := 0
 	for _, rowGroup := range self.Footer.RowGroups {
 		for _, columnChunk := range rowGroup.Columns {
-			columnIndexBuf, err := ts.Write(context.TODO(), self.ColumnIndexes[idx])
+			columnIndexBuf, err := ts.Write(self.ColumnIndexes[idx])
 			if err != nil {
 				return err
 			}
@@ -163,7 +162,7 @@ func (self *ParquetWriter) WriteStop() error {
 	idx = 0
 	for _, rowGroup := range self.Footer.RowGroups {
 		for _, columnChunk := range rowGroup.Columns {
-			offsetIndexBuf, err := ts.Write(context.TODO(), self.OffsetIndexes[idx])
+			offsetIndexBuf, err := ts.Write(self.OffsetIndexes[idx])
 			if err != nil {
 				return err
 			}
@@ -180,10 +179,9 @@ func (self *ParquetWriter) WriteStop() error {
 
 			self.Offset += int64(offsetIndexBufSize)
 		}
-	}	
+	}
 
-
-	footerBuf, err := ts.Write(context.TODO(), self.Footer)
+	footerBuf, err := ts.Write(self.Footer)
 	if err != nil {
 		return err
 	}
@@ -391,7 +389,7 @@ func (self *ParquetWriter) Flush(flag bool) error {
 
 			pageCount := len(rowGroup.Chunks[k].Pages)
 
-			//add ColumnIndex 
+			//add ColumnIndex
 			columnIndex := parquet.NewColumnIndex()
 			columnIndex.NullPages = make([]bool, pageCount)
 			columnIndex.MinValues = make([][]byte, pageCount)

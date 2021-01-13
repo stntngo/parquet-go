@@ -2,7 +2,7 @@ package compress
 
 import (
 	"bytes"
-	"github.com/xitongsys/parquet-go/parquet"
+	"github.com/stntngo/parquet-go/parquet"
 	"testing"
 )
 

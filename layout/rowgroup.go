@@ -4,10 +4,10 @@ import (
 	"errors"
 	"sync"
 
-	"github.com/xitongsys/parquet-go/common"
-	"github.com/xitongsys/parquet-go/parquet"
-	"github.com/xitongsys/parquet-go/schema"
-	"github.com/xitongsys/parquet-go/source"
+	"github.com/stntngo/parquet-go/common"
+	"github.com/stntngo/parquet-go/parquet"
+	"github.com/stntngo/parquet-go/schema"
+	"github.com/stntngo/parquet-go/source"
 )
 
 //RowGroup stores the RowGroup in parquet file

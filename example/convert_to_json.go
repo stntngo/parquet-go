@@ -5,10 +5,10 @@ import (
 	"time"
 	"encoding/json"
 
-	"github.com/xitongsys/parquet-go-source/local"
-	"github.com/xitongsys/parquet-go/reader"
-	"github.com/xitongsys/parquet-go/writer"
-	"github.com/xitongsys/parquet-go/parquet"
+	"github.com/stntngo/parquet-go/local"
+	"github.com/stntngo/parquet-go/reader"
+	"github.com/stntngo/parquet-go/writer"
+	"github.com/stntngo/parquet-go/parquet"
 )
 
 type Student struct {

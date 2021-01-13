@@ -5,10 +5,10 @@ import (
 	"reflect"
 	"strings"
 
-	"github.com/xitongsys/parquet-go/common"
-	"github.com/xitongsys/parquet-go/layout"
-	"github.com/xitongsys/parquet-go/parquet"
-	"github.com/xitongsys/parquet-go/schema"
+	"github.com/stntngo/parquet-go/common"
+	"github.com/stntngo/parquet-go/layout"
+	"github.com/stntngo/parquet-go/parquet"
+	"github.com/stntngo/parquet-go/schema"
 )
 
 //Record Map KeyValue pair
