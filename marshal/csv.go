@@ -3,12 +3,12 @@ package marshal
 import (
 	"github.com/stntngo/parquet-go/common"
 	"github.com/stntngo/parquet-go/layout"
-	"github.com/stntngo/parquet-go/schema"
 	"github.com/stntngo/parquet-go/parquet"
+	"github.com/stntngo/parquet-go/schema"
 )
 
 //Marshal function for CSV like data
-func MarshalCSV(records []interface{}, bgn int, end int, schemaHandler *schema.SchemaHandler) (*map[string]*layout.Table, error) {
+func MarshalCSV(records []interface{}, schemaHandler *schema.SchemaHandler) (*map[string]*layout.Table, error) {
 	res := make(map[string]*layout.Table)
 	if ln := len(records); ln <= 0 {
 		return &res, nil
@@ -16,23 +16,28 @@ func MarshalCSV(records []interface{}, bgn int, end int, schemaHandler *schema.S
 
 	for i := 0; i < len(records[0].([]interface{})); i++ {
 		pathStr := schemaHandler.GetRootInName() + "." + schemaHandler.Infos[i+1].InName
-		res[pathStr] = layout.NewEmptyTable()
-		res[pathStr].Path = common.StrToPath(pathStr)
-		res[pathStr].MaxDefinitionLevel = 1
-		res[pathStr].MaxRepetitionLevel = 0
-		res[pathStr].RepetitionType = parquet.FieldRepetitionType_OPTIONAL
-		res[pathStr].Type = schemaHandler.SchemaElements[schemaHandler.MapIndex[pathStr]].GetType()
-		res[pathStr].Info = schemaHandler.Infos[i+1]
+		table := layout.NewEmptyTable()
+		res[pathStr] = table
+		table.Path = common.StrToPath(pathStr)
+		table.MaxDefinitionLevel = 1
+		table.MaxRepetitionLevel = 0
+		table.RepetitionType = parquet.FieldRepetitionType_OPTIONAL
+		table.Schema = schemaHandler.SchemaElements[schemaHandler.MapIndex[pathStr]]
+		table.Info = schemaHandler.Infos[i+1]
+		// Pre-allocate these arrays for efficiency
+		table.Values = make([]interface{}, 0, len(records))
+		table.RepetitionLevels = make([]int32, 0, len(records))
+		table.DefinitionLevels = make([]int32, 0, len(records))
 
-		for j := bgn; j < end; j++ {
+		for j := 0; j < len(records); j++ {
 			rec := records[j].([]interface{})[i]
-			res[pathStr].Values = append(res[pathStr].Values, rec)
-			res[pathStr].RepetitionLevels = append(res[pathStr].RepetitionLevels, 0)
+			table.Values = append(table.Values, rec)
+			table.RepetitionLevels = append(table.RepetitionLevels, 0)
 
 			if rec == nil {
-				res[pathStr].DefinitionLevels = append(res[pathStr].DefinitionLevels, 0)
+				table.DefinitionLevels = append(table.DefinitionLevels, 0)
 			} else {
-				res[pathStr].DefinitionLevels = append(res[pathStr].DefinitionLevels, 1)
+				table.DefinitionLevels = append(table.DefinitionLevels, 1)
 			}
 		}
 	}

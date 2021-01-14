@@ -2,9 +2,10 @@ package encoding
 
 import (
 	"bytes"
+	"encoding/binary"
+	"math/bits"
 	"reflect"
 
-	"github.com/stntngo/parquet-go/common"
 	"github.com/stntngo/parquet-go/parquet"
 )
 
@@ -101,14 +102,21 @@ func WritePlainDOUBLE(nums []interface{}) []byte {
 }
 
 func WritePlainBYTE_ARRAY(arrays []interface{}) []byte {
-	bufWriter := new(bytes.Buffer)
-	cnt := len(arrays)
-	for i := 0; i < int(cnt); i++ {
-		ln := int32(len(arrays[i].(string)))
-		BinaryWriteINT32(bufWriter, []interface{}{ln})
-		bufWriter.WriteString(arrays[i].(string))
+	bufLen := 0
+	for i := 0; i < len(arrays); i++ {
+		bufLen += 4 + len(arrays[i].(string))
 	}
-	return bufWriter.Bytes()
+
+	buf := make([]byte, bufLen)
+	pos := 0
+	for i := 0; i < len(arrays); i++ {
+		value := arrays[i].(string)
+		binary.LittleEndian.PutUint32(buf[pos:], uint32(len(value)))
+		pos += 4
+		copy(buf[pos:pos+len(value)], value)
+		pos += len(value)
+	}
+	return buf
 }
 
 func WritePlainFIXED_LEN_BYTE_ARRAY(arrays []interface{}) []byte {
@@ -121,7 +129,7 @@ func WritePlainFIXED_LEN_BYTE_ARRAY(arrays []interface{}) []byte {
 }
 
 func WriteUnsignedVarInt(num uint64) []byte {
-	byteNum := (common.BitNum(uint64(num)) + 6) / 7
+	byteNum := (bits.Len64(uint64(num)) + 6) / 7
 	if byteNum == 0 {
 		return make([]byte, 1)
 	}
@@ -164,6 +172,39 @@ func WriteRLE(vals []interface{}, bitWidth int32, pt parquet.Type) []byte {
 
 func WriteRLEBitPackedHybrid(vals []interface{}, bitWidths int32, pt parquet.Type) []byte {
 	rleBuf := WriteRLE(vals, bitWidths, pt)
+	res := make([]byte, 0)
+	lenBuf := WritePlain([]interface{}{int32(len(rleBuf))}, parquet.Type_INT32)
+	res = append(res, lenBuf...)
+	res = append(res, rleBuf...)
+	return res
+}
+
+func WriteRLEInt32(vals []int32, bitWidth int32) []byte {
+	ln := len(vals)
+	i := 0
+	res := make([]byte, 0)
+	for i < ln {
+		j := i + 1
+		for j < ln && vals[j] == vals[i] {
+			j++
+		}
+		num := j - i
+		header := num << 1
+		byteNum := (bitWidth + 7) / 8
+		headerBuf := WriteUnsignedVarInt(uint64(header))
+
+		var valBuf [4]byte
+		binary.LittleEndian.PutUint32(valBuf[:], uint32(vals[i]))
+
+		res = append(res, headerBuf...)
+		res = append(res, valBuf[:byteNum]...)
+		i = j
+	}
+	return res
+}
+
+func WriteRLEBitPackedHybridInt32(vals []int32, bitWidths int32) []byte {
+	rleBuf := WriteRLEInt32(vals, bitWidths)
 	res := make([]byte, 0)
 	lenBuf := WritePlain([]interface{}{int32(len(rleBuf))}, parquet.Type_INT32)
 	res = append(res, lenBuf...)
@@ -285,7 +326,7 @@ func WriteDeltaINT32(nums []interface{}) []byte {
 					maxValue = blockBuf[k].(int32)
 				}
 			}
-			bitWidths[j] = byte(common.BitNum(uint64(maxValue)))
+			bitWidths[j] = byte(bits.Len32(uint32(maxValue)))
 		}
 
 		var minDeltaZigZag uint64 = uint64((minDelta >> 31) ^ (minDelta << 1))
@@ -343,7 +384,7 @@ func WriteDeltaINT64(nums []interface{}) []byte {
 					maxValue = blockBuf[k].(int64)
 				}
 			}
-			bitWidths[j] = byte(common.BitNum(uint64(maxValue)))
+			bitWidths[j] = byte(bits.Len64(uint64(maxValue)))
 		}
 
 		var minDeltaZigZag uint64 = uint64((minDelta >> 63) ^ (minDelta << 1))
@@ -360,19 +401,17 @@ func WriteDeltaINT64(nums []interface{}) []byte {
 
 func WriteDeltaLengthByteArray(arrays []interface{}) []byte {
 	ln := len(arrays)
-	res := make([]byte, 0)
 	lengthArray := make([]interface{}, ln)
 	for i := 0; i < ln; i++ {
 		array := reflect.ValueOf(arrays[i]).String()
 		lengthArray[i] = int32(len(array))
 	}
 
-	lengthBuf := WriteDeltaINT32(lengthArray)
-	res = append(res, lengthBuf...)
+	res := WriteDeltaINT32(lengthArray)
 
 	for i := 0; i < ln; i++ {
 		array := reflect.ValueOf(arrays[i]).String()
-		res = append(res, []byte(array)...)
+		res = append(res, array...)
 	}
 	return res
 }

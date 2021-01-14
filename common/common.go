@@ -20,9 +20,9 @@ type Tag struct {
 	KeyType   string
 	ValueType string
 
-	BaseType      string
-	KeyBaseType   string
-	ValueBaseType string
+	ConvertedType      string
+	KeyConvertedType   string
+	ValueConvertedType string
 
 	Length      int32
 	KeyLength   int32
@@ -36,6 +36,10 @@ type Tag struct {
 	KeyPrecision   int32
 	ValuePrecision int32
 
+	IsAdjustedToUTC bool
+	KeyIsAdjustedToUTC bool
+	ValueIsAdjustedToUTC bool
+
 	FieldID      int32
 	KeyFieldID   int32
 	ValueFieldID int32
@@ -44,13 +48,25 @@ type Tag struct {
 	KeyEncoding   parquet.Encoding
 	ValueEncoding parquet.Encoding
 
+	OmitStats      bool
+	KeyOmitStats   bool
+	ValueOmitStats bool
+
 	RepetitionType      parquet.FieldRepetitionType
 	KeyRepetitionType   parquet.FieldRepetitionType
 	ValueRepetitionType parquet.FieldRepetitionType
+
+	LogicalTypeFields 		map[string]string
+	KeyLogicalTypeFields 	map[string]string
+	ValueLogicalTypeFields 	map[string]string
 }
 
 func NewTag() *Tag {
-	return &Tag{}
+	return &Tag{
+		LogicalTypeFields: make(map[string]string),
+		KeyLogicalTypeFields: make(map[string]string),
+		ValueLogicalTypeFields: make(map[string]string),
+	}
 }
 
 func StringToTag(tag string) *Tag {
@@ -78,6 +94,14 @@ func StringToTag(tag string) *Tag {
 			return int32(valInt)
 		}
 
+		valBoolean := func() bool {
+			valBoolean, err := strconv.ParseBool(val)
+			if err != nil {
+				panic(err)
+			}
+			return valBoolean
+		}
+
 		switch key {
 		case "type":
 			mp.Type = val
@@ -85,12 +109,12 @@ func StringToTag(tag string) *Tag {
 			mp.KeyType = val
 		case "valuetype":
 			mp.ValueType = val
-		case "basetype":
-			mp.BaseType = val
-		case "keybasetype":
-			mp.KeyBaseType = val
-		case "valuebasetype":
-			mp.ValueBaseType = val
+		case "convertedtype":
+			mp.ConvertedType = val
+		case "keyconvertedtype":
+			mp.KeyConvertedType = val
+		case "valueconvertedtype":
+			mp.ValueConvertedType = val
 		case "length":
 			mp.Length = valInt32()
 		case "keylength":
@@ -115,13 +139,25 @@ func StringToTag(tag string) *Tag {
 			mp.KeyFieldID = valInt32()
 		case "valuefieldid":
 			mp.ValueFieldID = valInt32()
+		case "isadjustedtoutc":
+			mp.IsAdjustedToUTC = valBoolean()
+		case "keyisadjustedtoutc":
+			mp.KeyIsAdjustedToUTC = valBoolean()
+		case "valueisadjustedtoutc":
+			mp.ValueIsAdjustedToUTC = valBoolean()
 		case "name":
 			if mp.InName == "" {
-				mp.InName = HeadToUpper(val)
+				mp.InName = StringToVariableName(val)
 			}
 			mp.ExName = val
 		case "inname":
 			mp.InName = val
+		case "omitstats":
+			mp.OmitStats = valBoolean()
+		case "keyomitstats":
+			mp.KeyOmitStats = valBoolean()
+		case "valueomitstats":
+			mp.ValueOmitStats = valBoolean()
 		case "repetitiontype":
 			switch strings.ToLower(val) {
 			case "repeated":
@@ -205,7 +241,17 @@ func StringToTag(tag string) *Tag {
 				panic(fmt.Errorf("Unknown valueencoding type: '%v'", val))
 			}
 		default:
-			panic(fmt.Errorf("Unrecognized tag '%v'", key))
+			if strings.HasPrefix(key, "logicaltype") {
+				mp.LogicalTypeFields[key] = val
+			} else if strings.HasPrefix(key, "keylogicaltype") {
+				newKey := key[3:]
+				mp.KeyLogicalTypeFields[newKey] = val
+			} else if strings.HasPrefix(key, "valuelogicaltype") {
+				newKey := key[5:]
+				mp.ValueLogicalTypeFields[newKey] = val
+			} else {
+				panic(fmt.Errorf("Unrecognized tag '%v'", key))
+			}
 		}
 	}
 	return mp
@@ -221,31 +267,205 @@ func NewSchemaElementFromTagMap(info *Tag) *parquet.SchemaElement {
 	schema.RepetitionType = &info.RepetitionType
 	schema.NumChildren = nil
 
-	typeName := info.Type
-	if t, err := parquet.TypeFromString(typeName); err == nil {
+	if t, err := parquet.TypeFromString(info.Type); err == nil {
 		schema.Type = &t
+
 	} else {
-		ct, _ := parquet.ConvertedTypeFromString(typeName)
-		schema.ConvertedType = &ct
-		if typeName == "INT_8" || typeName == "INT_16" || typeName == "INT_32" ||
-			typeName == "UINT_8" || typeName == "UINT_16" || typeName == "UINT_32" ||
-			typeName == "DATE" || typeName == "TIME_MILLIS" {
-			schema.Type = parquet.TypePtr(parquet.Type_INT32)
-		} else if typeName == "INT_64" || typeName == "UINT_64" ||
-			typeName == "TIME_MICROS" || typeName == "TIMESTAMP_MICROS" || typeName == "TIMESTAMP_MILLIS" {
-			schema.Type = parquet.TypePtr(parquet.Type_INT64)
-		} else if typeName == "UTF8" {
-			schema.Type = parquet.TypePtr(parquet.Type_BYTE_ARRAY)
-		} else if typeName == "INTERVAL" {
-			schema.Type = parquet.TypePtr(parquet.Type_FIXED_LEN_BYTE_ARRAY)
-			var ln int32 = 12
-			schema.TypeLength = &ln
-		} else if typeName == "DECIMAL" {
-			t, _ = parquet.TypeFromString(info.BaseType)
-			schema.Type = &t
-		}
+		panic("type " + info.Type + ": " + err.Error())
 	}
+
+	if ct, err := parquet.ConvertedTypeFromString(info.ConvertedType); err == nil {
+		schema.ConvertedType = &ct
+	}
+
+	var logicalType *parquet.LogicalType
+	if len(info.LogicalTypeFields) > 0 {
+		logicalType = NewLogicalTypeFromFieldsMap(info.LogicalTypeFields)
+	} else {
+		logicalType = NewLogicalTypeFromConvertedType(schema, info)
+	}
+
+	schema.LogicalType = logicalType
+
 	return schema
+}
+
+func NewLogicalTypeFromFieldsMap(mp map[string]string) *parquet.LogicalType {
+	if val, ok := mp["logicaltype"]; !ok {
+		return nil
+
+	} else {
+		logicalType := parquet.NewLogicalType()
+		switch val {
+		case "STRING":
+			logicalType.STRING = parquet.NewStringType()
+		case "MAP":
+			logicalType.MAP = parquet.NewMapType()
+		case "LIST":
+			logicalType.LIST = parquet.NewListType()
+		case "ENUM":
+			logicalType.ENUM = parquet.NewEnumType()
+
+		case "DECIMAL":
+			logicalType.DECIMAL = parquet.NewDecimalType()
+			logicalType.DECIMAL.Precision = Str2Int32(mp["logicaltype.precision"])
+			logicalType.DECIMAL.Scale = Str2Int32(mp["logicaltype.scale"])
+
+		case "DATE":
+			logicalType.DATE = parquet.NewDateType()
+
+		case "TIME":
+			logicalType.TIME = parquet.NewTimeType()
+			logicalType.TIME.IsAdjustedToUTC = Str2Bool(mp["logicaltype.isadjustedtoutc"])
+			switch mp["logicaltype.unit"] {
+			case "MILLIS":
+				logicalType.TIME.Unit = parquet.NewTimeUnit()
+				logicalType.TIME.Unit.MILLIS = parquet.NewMilliSeconds()
+			case "MICROS":
+				logicalType.TIME.Unit = parquet.NewTimeUnit()
+				logicalType.TIME.Unit.MICROS = parquet.NewMicroSeconds()
+			case "NANOS":
+				logicalType.TIME.Unit = parquet.NewTimeUnit()
+				logicalType.TIME.Unit.NANOS = parquet.NewNanoSeconds()
+			default:
+				panic("logicaltype time error")
+			}
+			
+		case "TIMESTAMP":
+			logicalType.TIMESTAMP = parquet.NewTimestampType()
+			logicalType.TIMESTAMP.IsAdjustedToUTC = Str2Bool(mp["logicaltype.isadjustedtoutc"])
+			switch mp["logicaltype.unit"] {
+			case "MILLIS":
+				logicalType.TIMESTAMP.Unit = parquet.NewTimeUnit()
+				logicalType.TIMESTAMP.Unit.MILLIS = parquet.NewMilliSeconds()
+			case "MICROS":
+				logicalType.TIMESTAMP.Unit = parquet.NewTimeUnit()
+				logicalType.TIMESTAMP.Unit.MICROS = parquet.NewMicroSeconds()
+			case "NANOS":
+				logicalType.TIMESTAMP.Unit = parquet.NewTimeUnit()
+				logicalType.TIMESTAMP.Unit.NANOS = parquet.NewNanoSeconds()
+			default:
+				panic("logicaltype time error")
+			}
+
+		case "INTEGER":
+			logicalType.INTEGER = parquet.NewIntType()
+			logicalType.INTEGER.BitWidth = int8(Str2Int32(mp["logicaltype.bitwidth"]))
+			logicalType.INTEGER.IsSigned = Str2Bool(mp["logicaltype.issigned"])
+
+		case "JSON":
+			logicalType.JSON = parquet.NewJsonType()
+
+		case "BSON":
+			logicalType.BSON = parquet.NewBsonType()
+
+		case "UUID":
+			logicalType.UUID = parquet.NewUUIDType()
+
+		default:
+			panic("unknow logicaltype: " + val)
+		}
+
+		return logicalType
+	}
+}
+
+func NewLogicalTypeFromConvertedType(schemaElement *parquet.SchemaElement, info *Tag) *parquet.LogicalType {
+	_, ct := schemaElement.Type, schemaElement.ConvertedType
+	if ct == nil {
+		return nil
+	}
+
+	logicalType := parquet.NewLogicalType()
+	switch *ct {
+	case parquet.ConvertedType_INT_8:
+		logicalType.INTEGER = parquet.NewIntType()
+		logicalType.INTEGER.BitWidth = 8
+		logicalType.INTEGER.IsSigned = true
+	case parquet.ConvertedType_INT_16:
+		logicalType.INTEGER = parquet.NewIntType()
+		logicalType.INTEGER.BitWidth = 16
+		logicalType.INTEGER.IsSigned = true
+	case parquet.ConvertedType_INT_32:
+		logicalType.INTEGER = parquet.NewIntType()
+		logicalType.INTEGER.BitWidth = 32
+		logicalType.INTEGER.IsSigned = true
+	case parquet.ConvertedType_INT_64:
+		logicalType.INTEGER = parquet.NewIntType()
+		logicalType.INTEGER.BitWidth = 64
+		logicalType.INTEGER.IsSigned = true
+	case parquet.ConvertedType_UINT_8:
+		logicalType.INTEGER = parquet.NewIntType()
+		logicalType.INTEGER.BitWidth = 8
+		logicalType.INTEGER.IsSigned = false
+	case parquet.ConvertedType_UINT_16:
+		logicalType.INTEGER = parquet.NewIntType()
+		logicalType.INTEGER.BitWidth = 16
+		logicalType.INTEGER.IsSigned = false
+	case parquet.ConvertedType_UINT_32:
+		logicalType.INTEGER = parquet.NewIntType()
+		logicalType.INTEGER.BitWidth = 32
+		logicalType.INTEGER.IsSigned = false
+	case parquet.ConvertedType_UINT_64:
+		logicalType.INTEGER = parquet.NewIntType()
+		logicalType.INTEGER.BitWidth = 64
+		logicalType.INTEGER.IsSigned = false
+
+	case parquet.ConvertedType_DECIMAL:
+		logicalType.DECIMAL = parquet.NewDecimalType()
+		logicalType.DECIMAL.Precision = info.Precision
+		logicalType.DECIMAL.Scale = info.Scale
+
+	case parquet.ConvertedType_DATE:
+		logicalType.DATE = parquet.NewDateType()
+	
+	case parquet.ConvertedType_TIME_MICROS:
+		logicalType.TIME = parquet.NewTimeType()
+		logicalType.TIME.IsAdjustedToUTC = info.IsAdjustedToUTC
+		logicalType.TIME.Unit = parquet.NewTimeUnit()
+		logicalType.TIME.Unit.MICROS = parquet.NewMicroSeconds()
+
+	case parquet.ConvertedType_TIME_MILLIS:
+		logicalType.TIME = parquet.NewTimeType()
+		logicalType.TIME.IsAdjustedToUTC = info.IsAdjustedToUTC
+		logicalType.TIME.Unit = parquet.NewTimeUnit()
+		logicalType.TIME.Unit.MILLIS = parquet.NewMilliSeconds()
+
+	case parquet.ConvertedType_TIMESTAMP_MICROS:
+		logicalType.TIMESTAMP = parquet.NewTimestampType()
+		logicalType.TIMESTAMP.IsAdjustedToUTC = info.IsAdjustedToUTC
+		logicalType.TIMESTAMP.Unit = parquet.NewTimeUnit()
+		logicalType.TIMESTAMP.Unit.MICROS = parquet.NewMicroSeconds()
+
+	case parquet.ConvertedType_TIMESTAMP_MILLIS:
+		logicalType.TIMESTAMP = parquet.NewTimestampType()
+		logicalType.TIMESTAMP.IsAdjustedToUTC = info.IsAdjustedToUTC
+		logicalType.TIMESTAMP.Unit = parquet.NewTimeUnit()
+		logicalType.TIMESTAMP.Unit.MILLIS = parquet.NewMilliSeconds()
+
+	case parquet.ConvertedType_BSON:
+		logicalType.BSON = parquet.NewBsonType()
+
+	case parquet.ConvertedType_ENUM:
+		logicalType.ENUM = parquet.NewEnumType()
+
+	case parquet.ConvertedType_JSON:
+		logicalType.JSON = parquet.NewJsonType()
+
+	case parquet.ConvertedType_LIST:
+		logicalType.LIST = parquet.NewListType()
+
+	case parquet.ConvertedType_MAP:
+		logicalType.MAP = parquet.NewMapType()
+
+	case parquet.ConvertedType_UTF8:
+		logicalType.STRING = parquet.NewStringType()
+
+	default:
+		return nil
+	}
+
+	return logicalType
 }
 
 func DeepCopy(src, dst interface{}) {
@@ -261,12 +481,14 @@ func GetKeyTagMap(src *Tag) *Tag {
 	res.InName = "Key"
 	res.ExName = "key"
 	res.Type = src.KeyType
-	res.BaseType = src.KeyBaseType
+	res.ConvertedType = src.KeyConvertedType
+	res.IsAdjustedToUTC = src.KeyIsAdjustedToUTC
 	res.Length = src.KeyLength
 	res.Scale = src.KeyScale
 	res.Precision = src.KeyPrecision
 	res.FieldID = src.KeyFieldID
 	res.Encoding = src.KeyEncoding
+	res.OmitStats = src.KeyOmitStats
 	res.RepetitionType = parquet.FieldRepetitionType_REQUIRED
 	return res
 }
@@ -277,14 +499,38 @@ func GetValueTagMap(src *Tag) *Tag {
 	res.InName = "Value"
 	res.ExName = "value"
 	res.Type = src.ValueType
-	res.BaseType = src.ValueBaseType
+	res.ConvertedType = src.ValueConvertedType
+	res.IsAdjustedToUTC = src.ValueIsAdjustedToUTC
 	res.Length = src.ValueLength
 	res.Scale = src.ValueScale
 	res.Precision = src.ValuePrecision
 	res.FieldID = src.ValueFieldID
 	res.Encoding = src.ValueEncoding
+	res.OmitStats = src.ValueOmitStats
 	res.RepetitionType = src.ValueRepetitionType
 	return res
+}
+
+//Convert string to a golang variable name
+func StringToVariableName(str string) string {
+	ln := len(str)
+	if ln <= 0 {
+		return str
+	}
+
+	name := ""
+	for i := 0; i < ln; i++ {
+		c := str[i]
+		if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') || (c >= '0' && c <= '9') || c == '_' {
+			name += string(c)
+
+		} else {
+			name += strconv.Itoa(int(c))
+		}
+	}
+
+	name = HeadToUpper(name)
+	return name
 }
 
 //Convert the first letter of a string to uppercase
@@ -293,16 +539,13 @@ func HeadToUpper(str string) string {
 	if ln <= 0 {
 		return str
 	}
-	return strings.ToUpper(str[0:1]) + str[1:]
-}
 
-//Get the number of bits needed by the num; 0 needs 0, 1 need 1, 2 need 2, 3 need 2 ....
-func BitNum(num uint64) uint64 {
-	var bitn uint64 = 0
-	for ; num != 0; num >>= 1 {
-		bitn++
+	c := str[0]
+	if (c >= 'a' && c <= 'z') || (c >= 'A' && c <= 'Z') {
+		return strings.ToUpper(str[0:1]) + str[1:]
 	}
-	return bitn
+	//handle non-alpha prefix such as "_"
+	return "PARGO_PREFIX_" + str
 }
 
 func CmpIntBinary(as string, bs string, order string, signed bool) bool {
@@ -365,136 +608,269 @@ func CmpIntBinary(as string, bs string, order string, signed bool) bool {
 	return false
 }
 
-//Compare two values:
-//a<b return true
-//a>=b return false
-func Cmp(ai interface{}, bi interface{}, pT *parquet.Type, cT *parquet.ConvertedType) bool {
-	if ai == nil && bi != nil {
-		return true
-	} else if ai == nil && bi == nil {
-		return false
-	} else if ai != nil && bi == nil {
-		return false
+func FindFuncTable(pT *parquet.Type, cT *parquet.ConvertedType, logT *parquet.LogicalType) FuncTable {
+	if cT == nil && logT == nil {
+		if *pT == parquet.Type_BOOLEAN {
+			return boolFuncTable{}
+		} else if *pT == parquet.Type_INT32 {
+			return int32FuncTable{}
+		} else if *pT == parquet.Type_INT64 {
+			return int64FuncTable{}
+		} else if *pT == parquet.Type_INT96 {
+			return int96FuncTable{}
+		} else if *pT == parquet.Type_FLOAT {
+			return float32FuncTable{}
+		} else if *pT == parquet.Type_DOUBLE {
+			return float64FuncTable{}
+		} else if *pT == parquet.Type_BYTE_ARRAY {
+			return stringFuncTable{}
+		} else if *pT == parquet.Type_FIXED_LEN_BYTE_ARRAY {
+			return stringFuncTable{}
+		}
 	}
 
-	if cT == nil {
-		if *pT == parquet.Type_BOOLEAN {
-			a, b := ai.(bool), bi.(bool)
-			if !a && b {
-				return true
+	if cT != nil {
+		if *cT == parquet.ConvertedType_UTF8 || *cT == parquet.ConvertedType_BSON || *cT == parquet.ConvertedType_JSON {
+			return stringFuncTable{}
+		} else if *cT == parquet.ConvertedType_INT_8 || *cT == parquet.ConvertedType_INT_16 || *cT == parquet.ConvertedType_INT_32 ||
+			*cT == parquet.ConvertedType_DATE || *cT == parquet.ConvertedType_TIME_MILLIS {
+			return int32FuncTable{}
+		} else if *cT == parquet.ConvertedType_UINT_8 || *cT == parquet.ConvertedType_UINT_16 || *cT == parquet.ConvertedType_UINT_32 {
+			return uint32FuncTable{}
+		} else if *cT == parquet.ConvertedType_INT_64 || *cT == parquet.ConvertedType_TIME_MICROS ||
+			*cT == parquet.ConvertedType_TIMESTAMP_MILLIS || *cT == parquet.ConvertedType_TIMESTAMP_MICROS {
+			return int64FuncTable{}
+		} else if *cT == parquet.ConvertedType_UINT_64 {
+			return uint64FuncTable{}
+		} else if *cT == parquet.ConvertedType_INTERVAL {
+			return intervalFuncTable{}
+		} else if *cT == parquet.ConvertedType_DECIMAL {
+			if *pT == parquet.Type_BYTE_ARRAY || *pT == parquet.Type_FIXED_LEN_BYTE_ARRAY {
+				return decimalStringFuncTable{}
+			} else if *pT == parquet.Type_INT32 {
+				return int32FuncTable{}
+			} else if *pT == parquet.Type_INT64 {
+				return int64FuncTable{}
 			}
-			return false
-		} else if *pT == parquet.Type_INT32 {
-			return ai.(int32) < bi.(int32)
+		}
+	}
 
-		} else if *pT == parquet.Type_INT64 {
-			return ai.(int64) < bi.(int64)
+	if logT != nil {
+		if logT.TIME != nil || logT.TIMESTAMP != nil {
+			return FindFuncTable(pT, nil, nil)
 
-		} else if *pT == parquet.Type_INT96 {
-			a, b := []byte(ai.(string)), []byte(bi.(string))
-			fa, fb := a[11]>>7, b[11]>>7
-			if fa > fb {
-				return true
-			} else if fa < fb {
-				return false
-			}
-			for i := 11; i >= 0; i-- {
-				if a[i] < b[i] {
-					return true
-				} else if a[i] > b[i] {
-					return false
+		} else if logT.DATE != nil {
+			return int32FuncTable{}
+
+		} else if logT.INTEGER != nil {
+			if logT.INTEGER.IsSigned {
+				return FindFuncTable(pT, nil, nil)
+
+			} else {
+				if *pT == parquet.Type_INT32 {
+					return uint32FuncTable{}
+
+				} else if *pT == parquet.Type_INT64 {
+					return uint64FuncTable{}
 				}
 			}
-			return false
 
-		} else if *pT == parquet.Type_FLOAT {
-			return ai.(float32) < bi.(float32)
+		} else if logT.DECIMAL != nil {
+			if *pT == parquet.Type_BYTE_ARRAY || *pT == parquet.Type_FIXED_LEN_BYTE_ARRAY {
+				return decimalStringFuncTable{}
+			} else if *pT == parquet.Type_INT32 {
+				return int32FuncTable{}
+			} else if *pT == parquet.Type_INT64 {
+				return int64FuncTable{}
+			}
 
-		} else if *pT == parquet.Type_DOUBLE {
-			return ai.(float64) < bi.(float64)
-
-		} else if *pT == parquet.Type_BYTE_ARRAY {
-			return ai.(string) < bi.(string)
-
-		} else if *pT == parquet.Type_FIXED_LEN_BYTE_ARRAY {
-			return ai.(string) < bi.(string)
+		} else if logT.BSON != nil || logT.JSON != nil || logT.STRING != nil || logT.UUID != nil {
+			return stringFuncTable{}
 		}
 	}
 
-	if *cT == parquet.ConvertedType_UTF8 {
-		return ai.(string) < bi.(string)
+	panic("No known func table in FindFuncTable")
+}
 
-	} else if *cT == parquet.ConvertedType_INT_8 || *cT == parquet.ConvertedType_INT_16 || *cT == parquet.ConvertedType_INT_32 ||
-		*cT == parquet.ConvertedType_DATE || *cT == parquet.ConvertedType_TIME_MILLIS {
-		return ai.(int32) < bi.(int32)
+func Str2Int32(val string) int32 {
+	valInt, err := strconv.Atoi(val)
+	if err != nil {
+		panic(err)
+	}
+	return int32(valInt)
+}
 
-	} else if *cT == parquet.ConvertedType_UINT_8 || *cT == parquet.ConvertedType_UINT_16 || *cT == parquet.ConvertedType_UINT_32 {
-		return uint32(ai.(int32)) < uint32(bi.(int32))
+func Str2Bool(val string) bool {
+	valBoolean, err := strconv.ParseBool(val)
+	if err != nil {
+		panic(err)
+	}
+	return valBoolean
+}
 
-	} else if *cT == parquet.ConvertedType_INT_64 || *cT == parquet.ConvertedType_TIME_MICROS ||
-		*cT == parquet.ConvertedType_TIMESTAMP_MILLIS || *cT == parquet.ConvertedType_TIMESTAMP_MICROS {
-		return ai.(int64) < bi.(int64)
+type FuncTable interface {
+	LessThan(a interface{}, b interface{}) bool
+	MinMaxSize(minVal interface{}, maxVal interface{}, val interface{}) (interface{}, interface{}, int32)
+}
 
-	} else if *cT == parquet.ConvertedType_UINT_64 {
-		return uint64(ai.(int64)) < uint64(bi.(int64))
+func Min(table FuncTable, a interface{}, b interface{}) interface{} {
+	if a == nil {
+		return b
+	}
+	if b == nil {
+		return a
+	}
+	if table.LessThan(a, b) {
+		return a
+	} else {
+		return b
+	}
+}
 
-	} else if *cT == parquet.ConvertedType_INTERVAL {
-		a, b := []byte(ai.(string)), []byte(bi.(string))
-		for i := 11; i >= 0; i-- {
-			if a[i] > b[i] {
-				return false
-			} else if a[i] < b[i] {
-				return true
-			}
-		}
+func Max(table FuncTable, a interface{}, b interface{}) interface{} {
+	if a == nil {
+		return b
+	}
+	if b == nil {
+		return a
+	}
+	if table.LessThan(a, b) {
+		return b
+	} else {
+		return a
+	}
+}
+
+type boolFuncTable struct{}
+
+func (_ boolFuncTable) LessThan(a interface{}, b interface{}) bool {
+	return !a.(bool) && b.(bool)
+}
+
+func (table boolFuncTable) MinMaxSize(minVal interface{}, maxVal interface{}, val interface{}) (interface{}, interface{}, int32) {
+	return Min(table, minVal, val), Max(table, maxVal, val), 1
+}
+
+type int32FuncTable struct{}
+
+func (_ int32FuncTable) LessThan(a interface{}, b interface{}) bool {
+	return a.(int32) < b.(int32)
+}
+
+func (table int32FuncTable) MinMaxSize(minVal interface{}, maxVal interface{}, val interface{}) (interface{}, interface{}, int32) {
+	return Min(table, minVal, val), Max(table, maxVal, val), 4
+}
+
+type uint32FuncTable struct{}
+
+func (_ uint32FuncTable) LessThan(a interface{}, b interface{}) bool {
+	return uint32(a.(int32)) < uint32(b.(int32))
+}
+
+func (table uint32FuncTable) MinMaxSize(minVal interface{}, maxVal interface{}, val interface{}) (interface{}, interface{}, int32) {
+	return Min(table, minVal, val), Max(table, maxVal, val), 4
+}
+
+type int64FuncTable struct{}
+
+func (_ int64FuncTable) LessThan(a interface{}, b interface{}) bool {
+	return a.(int64) < b.(int64)
+}
+
+func (table int64FuncTable) MinMaxSize(minVal interface{}, maxVal interface{}, val interface{}) (interface{}, interface{}, int32) {
+	return Min(table, minVal, val), Max(table, maxVal, val), 8
+}
+
+type uint64FuncTable struct{}
+
+func (_ uint64FuncTable) LessThan(a interface{}, b interface{}) bool {
+	return uint64(a.(int64)) < uint64(b.(int64))
+}
+
+func (table uint64FuncTable) MinMaxSize(minVal interface{}, maxVal interface{}, val interface{}) (interface{}, interface{}, int32) {
+	return Min(table, minVal, val), Max(table, maxVal, val), 8
+}
+
+type int96FuncTable struct{}
+
+func (_ int96FuncTable) LessThan(ai interface{}, bi interface{}) bool {
+	a, b := []byte(ai.(string)), []byte(bi.(string))
+	fa, fb := a[11]>>7, b[11]>>7
+	if fa > fb {
+		return true
+	} else if fa < fb {
 		return false
-
-	} else if *cT == parquet.ConvertedType_DECIMAL {
-		if *pT == parquet.Type_BYTE_ARRAY {
-			as, bs := ai.(string), bi.(string)
-			return CmpIntBinary(as, bs, "BigEndian", true)
-
-		} else if *pT == parquet.Type_FIXED_LEN_BYTE_ARRAY {
-			as, bs := ai.(string), bi.(string)
-			return CmpIntBinary(as, bs, "BigEndian", true)
-
-		} else if *pT == parquet.Type_INT32 {
-			return ai.(int32) < bi.(int32)
-
-		} else if *pT == parquet.Type_INT64 {
-			return ai.(int64) < bi.(int64)
-
+	}
+	for i := 11; i >= 0; i-- {
+		if a[i] < b[i] {
+			return true
+		} else if a[i] > b[i] {
+			return false
 		}
 	}
 	return false
 }
 
-//Get the maximum of two parquet values
-func Max(a interface{}, b interface{}, pT *parquet.Type, cT *parquet.ConvertedType) interface{} {
-	if a == nil {
-		return b
-	}
-	if b == nil {
-		return a
-	}
-	if Cmp(a, b, pT, cT) {
-		return b
-	}
-	return a
+func (table int96FuncTable) MinMaxSize(minVal interface{}, maxVal interface{}, val interface{}) (interface{}, interface{}, int32) {
+	return Min(table, minVal, val), Max(table, maxVal, val), int32(len(val.(string)))
 }
 
-//Get the minimum of two parquet values
-func Min(a interface{}, b interface{}, pT *parquet.Type, cT *parquet.ConvertedType) interface{} {
-	if a == nil {
-		return b
+type float32FuncTable struct{}
+
+func (_ float32FuncTable) LessThan(a interface{}, b interface{}) bool {
+	return a.(float32) < b.(float32)
+}
+
+func (table float32FuncTable) MinMaxSize(minVal interface{}, maxVal interface{}, val interface{}) (interface{}, interface{}, int32) {
+	return Min(table, minVal, val), Max(table, maxVal, val), 4
+}
+
+type float64FuncTable struct{}
+
+func (_ float64FuncTable) LessThan(a interface{}, b interface{}) bool {
+	return a.(float64) < b.(float64)
+}
+
+func (table float64FuncTable) MinMaxSize(minVal interface{}, maxVal interface{}, val interface{}) (interface{}, interface{}, int32) {
+	return Min(table, minVal, val), Max(table, maxVal, val), 8
+}
+
+type stringFuncTable struct{}
+
+func (_ stringFuncTable) LessThan(a interface{}, b interface{}) bool {
+	return a.(string) < b.(string)
+}
+
+func (table stringFuncTable) MinMaxSize(minVal interface{}, maxVal interface{}, val interface{}) (interface{}, interface{}, int32) {
+	return Min(table, minVal, val), Max(table, maxVal, val), int32(len(val.(string)))
+}
+
+type intervalFuncTable struct{}
+
+func (_ intervalFuncTable) LessThan(ai interface{}, bi interface{}) bool {
+	a, b := []byte(ai.(string)), []byte(bi.(string))
+	for i := 11; i >= 0; i-- {
+		if a[i] > b[i] {
+			return false
+		} else if a[i] < b[i] {
+			return true
+		}
 	}
-	if b == nil {
-		return a
-	}
-	if Cmp(a, b, pT, cT) {
-		return a
-	}
-	return b
+	return false
+}
+
+func (table intervalFuncTable) MinMaxSize(minVal interface{}, maxVal interface{}, val interface{}) (interface{}, interface{}, int32) {
+	return Min(table, minVal, val), Max(table, maxVal, val), int32(len(val.(string)))
+}
+
+type decimalStringFuncTable struct{}
+
+func (_ decimalStringFuncTable) LessThan(a interface{}, b interface{}) bool {
+	return CmpIntBinary(a.(string), b.(string), "BigEndian", true)
+}
+
+func (table decimalStringFuncTable) MinMaxSize(minVal interface{}, maxVal interface{}, val interface{}) (interface{}, interface{}, int32) {
+	return Min(table, minVal, val), Max(table, maxVal, val), int32(len(val.(string)))
 }
 
 //Get the size of a parquet value
@@ -523,19 +899,17 @@ func SizeOf(val reflect.Value) int64 {
 			size += SizeOf(val.MapIndex(keys[i]))
 		}
 		return size
-	}
-	switch val.Type().Name() {
-	case "bool":
+	case reflect.Bool:
 		return 1
-	case "int32":
+	case reflect.Int32:
 		return 4
-	case "int64":
+	case reflect.Int64:
 		return 8
-	case "string":
+	case reflect.String:
 		return int64(val.Len())
-	case "float32":
+	case reflect.Float32:
 		return 4
-	case "float64":
+	case reflect.Float64:
 		return 8
 	}
 	return 4

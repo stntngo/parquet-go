@@ -1,15 +1,23 @@
 package writer
 
 import (
+	"io"
+
 	"github.com/stntngo/parquet-go/layout"
 	"github.com/stntngo/parquet-go/marshal"
-	"github.com/stntngo/parquet-go/source"
-	"github.com/stntngo/parquet-go/schema"
 	"github.com/stntngo/parquet-go/parquet"
+	"github.com/stntngo/parquet-go/schema"
+	"github.com/stntngo/parquet-go/source"
+	"github.com/stntngo/parquet-go/writerfile"
 )
 
 type JSONWriter struct {
 	ParquetWriter
+}
+
+func NewJSONWriterFromWriter(jsonSchema string, w io.Writer, np int64) (*JSONWriter, error) {
+	wf := writerfile.NewWriterFile(w)
+	return NewJSONWriter(jsonSchema, wf, np)
 }
 
 //Create JSON writer

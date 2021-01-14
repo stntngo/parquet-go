@@ -1,16 +1,24 @@
 package writer
 
 import (
+	"io"
+
 	"github.com/stntngo/parquet-go/layout"
 	"github.com/stntngo/parquet-go/marshal"
+	"github.com/stntngo/parquet-go/parquet"
+	"github.com/stntngo/parquet-go/schema"
 	"github.com/stntngo/parquet-go/source"
 	"github.com/stntngo/parquet-go/types"
-	"github.com/stntngo/parquet-go/schema"
-	"github.com/stntngo/parquet-go/parquet"
+	"github.com/stntngo/parquet-go/writerfile"
 )
 
 type CSVWriter struct {
 	ParquetWriter
+}
+
+func NewCSVWriterFromWriter(md []string, w io.Writer, np int64) (*CSVWriter, error) {
+	wf := writerfile.NewWriterFile(w)
+	return NewCSVWriter(md, wf, np)
 }
 
 //Create CSV writer

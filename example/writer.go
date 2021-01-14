@@ -3,35 +3,34 @@ package main
 import (
 	"log"
 	"time"
-	"encoding/json"
+	"os"
 
 	"github.com/stntngo/parquet-go/local"
+	"github.com/stntngo/parquet-go/parquet"
 	"github.com/stntngo/parquet-go/reader"
 	"github.com/stntngo/parquet-go/writer"
-	"github.com/stntngo/parquet-go/parquet"
 )
 
 type Student struct {
 	Name    string  `parquet:"name=name, type=BYTE_ARRAY, convertedtype=UTF8, encoding=PLAIN_DICTIONARY"`
-	Age     int32   `parquet:"name=age, type=INT32"`
+	Age     int32   `parquet:"name=age, type=INT32, encoding=PLAIN"`
 	Id      int64   `parquet:"name=id, type=INT64"`
 	Weight  float32 `parquet:"name=weight, type=FLOAT"`
 	Sex     bool    `parquet:"name=sex, type=BOOLEAN"`
 	Day     int32   `parquet:"name=day, type=INT32, convertedtype=DATE"`
-	Scores	map[string]int32 `parquet:"name=scores, type=MAP, keytype=BYTE_ARRAY, keyconvertedtype=UTF8, valuetype=INT32"`
 	Ignored int32   //without parquet tag and won't write
 }
 
 func main() {
 	var err error
-	fw, err := local.NewLocalFileWriter("to_json.parquet")
+	w, err := os.Create("output/flat.parquet")
 	if err != nil {
 		log.Println("Can't create local file", err)
 		return
 	}
 
 	//write
-	pw, err := writer.NewParquetWriter(fw, new(Student), 4)
+	pw, err := writer.NewParquetWriterFromWriter(w, new(Student), 4)
 	if err != nil {
 		log.Println("Can't create parquet writer", err)
 		return
@@ -39,7 +38,7 @@ func main() {
 
 	pw.RowGroupSize = 128 * 1024 * 1024 //128M
 	pw.CompressionType = parquet.CompressionCodec_SNAPPY
-	num := 10
+	num := 100
 	for i := 0; i < num; i++ {
 		stu := Student{
 			Name:   "StudentName",
@@ -48,11 +47,6 @@ func main() {
 			Weight: float32(50.0 + float32(i)*0.1),
 			Sex:    bool(i%2 == 0),
 			Day:    int32(time.Now().Unix() / 3600 / 24),
-			Scores: map[string]int32{
-				"math": int32(90 + i%5),
-				"physics": int32(90 + i%3),
-				"computer": int32(80 + i%10),
-			},
 		}
 		if err = pw.Write(stu); err != nil {
 			log.Println("Write error", err)
@@ -63,35 +57,32 @@ func main() {
 		return
 	}
 	log.Println("Write Finished")
-	fw.Close()
+	w.Close()
 
 	///read
-	fr, err := local.NewLocalFileReader("to_json.parquet")
+	fr, err := local.NewLocalFileReader("output/flat.parquet")
 	if err != nil {
 		log.Println("Can't open file")
 		return
 	}
 
-	pr, err := reader.NewParquetReader(fr, nil, 4)
+	pr, err := reader.NewParquetReader(fr, new(Student), 4)
 	if err != nil {
 		log.Println("Can't create parquet reader", err)
 		return
 	}
-	
 	num = int(pr.GetNumRows())
-	res, err := pr.ReadByNumber(num)
-	if err != nil {
-		log.Println("Can't read", err)
-		return
+	for i := 0; i < num/10; i++ {
+		if i%2 == 0 {
+			pr.SkipRows(10) //skip 10 rows
+			continue
+		}
+		stus := make([]Student, 10) //read 10 rows
+		if err = pr.Read(&stus); err != nil {
+			log.Println("Read error", err)
+		}
+		log.Println(stus)
 	}
-
-	jsonBs, err := json.Marshal(res)
-	if err != nil {
-		log.Println("Can't to json", err)
-		return
-	}
-
-	log.Println(string(jsonBs))
 
 	pr.ReadStop()
 	fr.Close()

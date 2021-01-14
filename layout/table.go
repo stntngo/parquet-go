@@ -10,7 +10,7 @@ func NewTableFromTable(src *Table) *Table {
 		return nil
 	}
 	table := new(Table)
-	table.Type = src.Type
+	table.Schema = src.Schema
 	table.Path = append(table.Path, src.Path...)
 	table.MaxDefinitionLevel = 0
 	table.MaxRepetitionLevel = 0
@@ -28,8 +28,8 @@ func NewEmptyTable() *Table {
 type Table struct {
 	//Repetition type of the values: REQUIRED/OPTIONAL/REPEATED
 	RepetitionType parquet.FieldRepetitionType
-	//Parquet type
-	Type parquet.Type
+	//Schema
+	Schema *parquet.SchemaElement
 	//Path of this column
 	Path []string
 	//Maximum of definition levels

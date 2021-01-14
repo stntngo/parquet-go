@@ -4,16 +4,16 @@ import (
 	"encoding/binary"
 	"io"
 	"reflect"
-	"sync"
 	"strings"
+	"sync"
 
 	"github.com/apache/thrift/lib/go/thrift"
 	"github.com/stntngo/parquet-go/common"
 	"github.com/stntngo/parquet-go/layout"
 	"github.com/stntngo/parquet-go/marshal"
-	"github.com/stntngo/parquet-go/source"
-	"github.com/stntngo/parquet-go/schema"
 	"github.com/stntngo/parquet-go/parquet"
+	"github.com/stntngo/parquet-go/schema"
+	"github.com/stntngo/parquet-go/source"
 )
 
 type ParquetReader struct {
@@ -25,8 +25,8 @@ type ParquetReader struct {
 	ColumnBuffers map[string]*ColumnBufferType
 
 	//One reader can only read one type objects
-	ObjType			reflect.Type
-	ObjPartialType	reflect.Type
+	ObjType        reflect.Type
+	ObjPartialType reflect.Type
 }
 
 //Create a parquet reader: obj is a object with schema tags or a JSON schema string
@@ -45,13 +45,16 @@ func NewParquetReader(pFile source.ParquetFile, obj interface{}, np int64) (*Par
 			err = res.SetSchemaHandlerFromJSON(sa)
 			return res, err
 
+		} else if sa, ok := obj.([]*parquet.SchemaElement); ok {
+			res.SchemaHandler = schema.NewSchemaHandlerFromSchemaList(sa)
+
 		} else {
 			if res.SchemaHandler, err = schema.NewSchemaHandlerFromStruct(obj); err != nil {
 				return res, err
 			}
 		}
 
-	}else{
+	} else {
 		res.SchemaHandler = schema.NewSchemaHandlerFromSchemaList(res.Footer.Schema)
 	}
 
@@ -76,7 +79,6 @@ func (self *ParquetReader) SetSchemaHandlerFromJSON(jsonSchema string) error {
 		return err
 	}
 
-	
 	self.RenameSchema()
 	for i := 0; i < len(self.SchemaHandler.SchemaElements); i++ {
 		schemaElement := self.SchemaHandler.SchemaElements[i]
@@ -120,7 +122,7 @@ func (self *ParquetReader) GetFooterSize() (uint32, error) {
 	if _, err = self.PFile.Seek(-8, io.SeekEnd); err != nil {
 		return 0, err
 	}
-	if _, err = self.PFile.Read(buf); err != nil {
+	if _, err = io.ReadFull(self.PFile, buf); err != nil {
 		return 0, err
 	}
 	size := binary.LittleEndian.Uint32(buf)
@@ -195,7 +197,7 @@ func (self *ParquetReader) Read(dstInterface interface{}) error {
 
 // Read maxReadNumber objects
 func (self *ParquetReader) ReadByNumber(maxReadNumber int) ([]interface{}, error) {
-	var err error 
+	var err error
 	if self.ObjType == nil {
 		if self.ObjType, err = self.SchemaHandler.GetType(self.SchemaHandler.GetRootInName()); err != nil {
 			return nil, err
@@ -225,13 +227,13 @@ func (self *ParquetReader) ReadPartial(dstInterface interface{}, prefixPath stri
 	if err != nil {
 		return err
 	}
-	
+
 	return self.read(dstInterface, prefixPath)
 }
 
-// Read maxReadNumber partial objects 
+// Read maxReadNumber partial objects
 func (self *ParquetReader) ReadPartialByNumber(maxReadNumber int, prefixPath string) ([]interface{}, error) {
-	var err error 
+	var err error
 	if self.ObjPartialType == nil {
 		if self.ObjPartialType, err = self.SchemaHandler.GetType(prefixPath); err != nil {
 			return nil, err
@@ -323,7 +325,7 @@ func (self *ParquetReader) read(dstInterface interface{}, prefixPath string) err
 		}
 		wg.Add(1)
 		go func(b, e, index int) {
-			defer func(){
+			defer func() {
 				wg.Done()
 			}()
 

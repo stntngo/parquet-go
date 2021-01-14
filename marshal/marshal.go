@@ -7,9 +7,9 @@ import (
 
 	"github.com/stntngo/parquet-go/common"
 	"github.com/stntngo/parquet-go/layout"
-	"github.com/stntngo/parquet-go/types"
 	"github.com/stntngo/parquet-go/schema"
 	"github.com/stntngo/parquet-go/parquet"
+	"github.com/stntngo/parquet-go/types"
 )
 
 type Node struct {
@@ -194,7 +194,7 @@ func (p *ParquetMap) Marshal(node *Node, nodeBuf *NodeBufType) []*Node {
 }
 
 //Convert the objects to table map. srcInterface is a slice of objects
-func Marshal(srcInterface []interface{}, bgn int, end int, schemaHandler *schema.SchemaHandler) (tb *map[string]*layout.Table, err error) {
+func Marshal(srcInterface []interface{}, schemaHandler *schema.SchemaHandler) (tb *map[string]*layout.Table, err error) {
 	defer func() {
 		if r := recover(); r != nil {
 			switch x := r.(type) {
@@ -223,13 +223,13 @@ func Marshal(srcInterface []interface{}, bgn int, end int, schemaHandler *schema
 			res[pathStr].MaxDefinitionLevel, _ = schemaHandler.MaxDefinitionLevel(res[pathStr].Path)
 			res[pathStr].MaxRepetitionLevel, _ = schemaHandler.MaxRepetitionLevel(res[pathStr].Path)
 			res[pathStr].RepetitionType = schema.GetRepetitionType()
-			res[pathStr].Type = schemaHandler.SchemaElements[schemaHandler.MapIndex[pathStr]].GetType()
+			res[pathStr].Schema = schemaHandler.SchemaElements[schemaHandler.MapIndex[pathStr]]
 			res[pathStr].Info = schemaHandler.Infos[i]
 		}
 	}
 
 	stack := make([]*Node, 0, 100)
-	for i := bgn; i < end; i++ {
+	for i := 0; i < len(srcInterface); i++ {
 		stack = stack[:0]
 		nodeBuf.Reset()
 
@@ -266,8 +266,8 @@ func Marshal(srcInterface []interface{}, bgn int, end int, schemaHandler *schema
 			} else {
 				table := res[node.PathMap.Path]
 				schemaIndex := schemaHandler.MapIndex[node.PathMap.Path]
-				sele := schemaHandler.SchemaElements[schemaIndex]
-				table.Values = append(table.Values, types.GoTypeToParquetType(node.Val.Interface(), sele.Type, sele.ConvertedType))
+				schema := schemaHandler.SchemaElements[schemaIndex]
+				table.Values = append(table.Values, types.InterfaceToParquetType(node.Val.Interface(), schema.Type))
 				table.DefinitionLevels = append(table.DefinitionLevels, node.DL)
 				table.RepetitionLevels = append(table.RepetitionLevels, node.RL)
 				continue
