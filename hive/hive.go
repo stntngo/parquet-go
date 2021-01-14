@@ -13,6 +13,16 @@ var (
 // GetHiveType converts a Parquet Schema Element into its equivalent Hive Type as a string.
 func GetHiveType(el *parquet.SchemaElement) (string, error) {
 	if el.IsSetLogicalType() {
+		logical := el.GetLogicalType()
+
+		if logical.IsSetSTRING() {
+			return "string", nil
+		}
+
+		if logical.IsSetTIMESTAMP() {
+			return "timestamp", nil
+		}
+
 		return "", errUnsupportedParquetType
 	}
 
